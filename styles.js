@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
       shadowOffset: {width: 1, height: 1},
       justifyContent: "center",
       alignItems: "center",
-      margin: 3
+      margin: 3,
     },
   
     keyboardLetter: {
@@ -88,7 +88,6 @@ const styles = StyleSheet.create({
       fontSize: 12,
       fontWeight: "bold"
     },
-  
   
     header: {
       alignItems: "center"

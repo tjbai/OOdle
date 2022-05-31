@@ -6,7 +6,6 @@ import {
   Animated,
   Alert
 } from 'react-native';
-// import { useSetState } from "react-use"
 import { useFonts } from "expo-font"
 
 import GuessRow from "./components/GuessRow";
@@ -17,35 +16,54 @@ import styles from "./styles";
 import answers from "./assets/word-lists/answers.json"
 import guesses from "./assets/word-lists/guesses.json"
 
-let randomizeTarget = () => {
+let RAND_TARGET = () => {
   return answers[Math.floor(Math.random() * answers.length)].toUpperCase()
 }
-  
+
+let LDICT = {}
+let LETTERS = 
+["A", "B", "C", "D", "E", "F", "G", "H", "I",
+  "J", "K", "L", "M", "N", "O", "P", "Q", "R",
+    "S", "T", "U", "V", "W", "X", "Y", "Z"]
+LETTERS.map(l => LDICT[l] = -1)
+
 export default function App() {
 
-  // Refactor this mess with useSetState() at some point
   const [g, setG] = useState(Array(6).fill(""))
   const [s, setS] = useState(Array.from({length: 6}, () => new Array(5).fill(-1)))
-  const [target, setTarget] = useState(randomizeTarget()) 
-  const [winState, setWinState] = useState(false)
+
+  // Refactor this mess with useSetState() at some point
+  const [target, setTarget] = useState(RAND_TARGET()) 
+  const [winState, setWinState] = useState(-1)
   const [index, setIdx] = useState(0)
   const [streak, setStreak] = useState(0)
   const [avg, setAvg] = useState(0)
 
-  // let defaultState = {
-  //   guess: Array(6).fill(""),
-  //   sscore: Array.from({length: 6}, () => new Array(5).fill(-1)),
-  //   target: randomizeTarget(),
-  //   winState: false,
-  //   streak: 0,
-  //   average: 0,
-  //   index: 0
-  // }
-
   const [fadeAnim] = useState(new Animated.Value(0))
   const [flag, setFlag] = useState("")
 
-  // Helper functions
+  const [kbColors, setKBColors] = useState(LDICT)
+
+  // Updating state helper function. Should use spread operator.
+  function setGuess(newGuess) {
+    let n = g.map(x => x)
+    n[index] = newGuess
+    setG(n)
+  }
+
+  function setScore(newScore) {
+    let n = s.map(x => x)
+    n[index] = newScore
+    setS(n)
+  }
+
+  function setKeyboardColors(letter, value) {
+    let n = {...kbColors}
+    n[letter] = value
+    setKBColors(n)
+  }
+
+  // Animation helper functions
   function popup() {
     Animated.sequence([
       Animated.timing(fadeAnim, {
@@ -78,17 +96,18 @@ export default function App() {
     }).start();
   }
 
-  // Reset all boxes and select a new word
+  // Reset relevant states to default
   function resetScreen() {
     setG(Array(6).fill(""));
     setS(Array.from({length: 6}, () => new Array(5).fill(-1)));
     setIdx(0);
-    setWinState(false);
-    setTarget(randomizeTarget());
+    setWinState(-1);
+    setTarget(RAND_TARGET());
+    setKBColors(LDICT)
     fadeOut()
   }
 
-  // Reset screen, reveal answer, reset streak, reset average
+  // Reset button
   let handleReset = () => {
     Alert.alert(
       "Are you sure?",
@@ -98,7 +117,7 @@ export default function App() {
           text: "Cancel",
           style: "cancel"
         },
-        { text: "OK", onPress: () => {
+        { text: "Yes", onPress: () => {
             setStreak(0)
             setAvg(0)
             resetScreen()
@@ -106,30 +125,22 @@ export default function App() {
     }])
   }
 
-  // Reset screen, increment streak, reset average
+  // Next button
   let handleNext = () => {
-    if (winState) {
-      resetScreen();
+    if (winState == 1) {
+      resetScreen()
       setAvg(Math.round((streak*avg+index) / (streak+1) * 100) / 100)
-      setStreak(streak+1);
+      setStreak(streak+1)
+    }
+    else if (winState == 0) {
+      resetScreen()
+      setAvg(0)
+      setStreak(0)
     }
     else {
-      setFlag("Finish or RESET")
+      setFlag("Round incomplete")
       popup()
     }
-  }
-
-  // A little memory inefficiency for simplicity's sake
-  function setGuess(newGuess) {
-    let n = g.map(x => x)
-    n[index] = newGuess
-    setG(n)
-  }
-
-  function setScore(newScore) {
-    let n = s.map(x => x)
-    n[index] = newScore
-    setS(n)
   }
 
   // Perform word comparison and update score array
@@ -159,6 +170,9 @@ export default function App() {
         newScore[i] = 1;
         cmap.set(guess.charAt(i), cmap.get(guess.charAt(i)-1));
       }
+
+      // On the second pass, update keyboardColors
+      setKeyboardColors(gchar, newScore[i])
     }
     return newScore
   }
@@ -166,7 +180,7 @@ export default function App() {
   // Handle all key presses
   function handleKeyPress(input) {
     // If in a win state, need to update with reset
-    if (index >= 6 || winState) {
+    if (index >= 6 || winState == 1) {
       return 
     }
 
@@ -179,15 +193,19 @@ export default function App() {
 
     // User attempts to enter their guess
     if (input == "ENTER") {
-      // Check if word is valid
-      // if (is valid word)
-
       if (guess.length != 5) {
-        // alert("Too short")
         setFlag("Not enough letters")
         popup()
         return
       }
+
+      // Backdoor = "APAPA"
+      if (guess != "APAPA" && !guesses.includes(guess.toLowerCase())) {
+        setFlag("Not in word list")
+        popup()
+        return
+      }
+
       setIdx(index+1) // Increment guess index
 
       // Calculate new score, check if winning, and update
@@ -195,7 +213,7 @@ export default function App() {
       if (guess === target) {
         setFlag("Streak + 1!")
         popup()
-        setWinState(true)
+        setWinState(1)
       }
       setScore(newScore)
 
@@ -203,6 +221,7 @@ export default function App() {
       if (index >= 5) {
         setFlag("Answer was: " + target)
         fadeIn()
+        setWinState(0)
       }
       return
     }
@@ -240,7 +259,7 @@ export default function App() {
       <View style={styles.footer}>
         <Dashboard streak={streak} avg={avg} 
           reset={handleReset} next={handleNext}/>
-        <Keyboard keyHandler={handleKeyPress}/>
+        <Keyboard keyHandler={handleKeyPress} keyboardColors={kbColors}/>
       </View>
     </SafeAreaView>
   )
