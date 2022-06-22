@@ -107,6 +107,7 @@ const styles = StyleSheet.create({
     },
   
     dashboard: {
+      justifyContent: "center",
       flexDirection: "row",
     },
   
